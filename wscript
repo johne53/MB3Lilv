@@ -12,7 +12,7 @@ import waflib.Logs as Logs
 # major increment <=> incompatible changes
 # minor increment <=> compatible changes (additions)
 # micro increment <=> no interface changes
-LILV_VERSION       = '0.24.2'
+LILV_VERSION       = '0.24.3'
 LILV_MAJOR_VERSION = '0'
 
 # Mandatory waf variables
@@ -262,6 +262,14 @@ def build(bld):
                   defines         = defines + ['LILV_INTERNAL'])
         autowaf.use_lib(bld, obj, 'SERD SORD SRATOM LV2')
 
+    # Python bindings
+    if bld.is_defined('LILV_PYTHON'):
+        bld(features     = 'subst',
+            is_copy      = True,
+            source       = 'bindings/python/lilv.py',
+            target       = 'lilv.py',
+            install_path = '${PYTHONDIR}')
+
     if bld.env.BUILD_TESTS:
         test_libs      = lib
         test_cflags    = ['']
@@ -350,13 +358,6 @@ def build(bld):
         autowaf.use_lib(bld, obj, 'SERD SORD SRATOM LV2')
 
         if bld.is_defined('LILV_PYTHON'):
-            # Copy Python bindings to build directory
-            bld(features     = 'subst',
-                is_copy      = True,
-                source       = 'bindings/python/lilv.py',
-                target       = 'lilv.py',
-                install_path = '${PYTHONDIR}')
-
             # Copy Python unittest files
             for i in [ 'test_api.py' ]:
                 bld(features     = 'subst',
