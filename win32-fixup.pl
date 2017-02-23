@@ -4,12 +4,12 @@
 require "../local-paths.lib";
 
 $package_string = "\"lilv 0.24\"";
-$version_string = "\"0.24.2\"";
-$lilv_version = "0.24.2";
+$version_string = "\"0.24.3\"";
+$lilv_version = "0.24.3";
 $major = 0;
 $minor = 24;
-$micro = 2;
-$binary_age = 2402;
+$micro = 3;
+$binary_age = 2403;
 $interface_age = 0;
 $current_minus_age = 0;
 $gettext_package = "lilv";
