@@ -35,32 +35,37 @@ test_plugins = [
     'old_version'
 ]
 
-def options(opt):
-    opt.load('compiler_c')
-    opt.load('compiler_cxx')
-    opt.load('python')
-    autowaf.set_options(opt, test=True)
+def options(ctx):
+    ctx.load('compiler_c')
+    ctx.load('compiler_cxx')
+    ctx.load('python')
+    autowaf.set_options(ctx, test=True)
+    opt = ctx.get_option_group('Configuration options')
     opt.add_option('--no-utils', action='store_true', dest='no_utils',
-                   help='Do not build command line utilities')
+                   help='do not build command line utilities')
     opt.add_option('--bindings', action='store_true', dest='bindings',
-                   help='Build python bindings')
+                   help='build python bindings')
     opt.add_option('--dyn-manifest', action='store_true', dest='dyn_manifest',
-                   help='Build support for dynamic manifests')
+                   help='build support for dynamic manifests')
     opt.add_option('--no-bash-completion', action='store_true',
                    dest='no_bash_completion',
-                   help='Do not install bash completion script in CONFIGDIR')
+                   help='do not install bash completion script in CONFIGDIR')
     opt.add_option('--static', action='store_true', dest='static',
-                   help='Build static library')
+                   help='build static library')
     opt.add_option('--no-shared', action='store_true', dest='no_shared',
-                   help='Do not build shared library')
+                   help='do not build shared library')
     opt.add_option('--static-progs', action='store_true', dest='static_progs',
-                   help='Build programs as static binaries')
+                   help='build programs as static binaries')
     opt.add_option('--default-lv2-path', type='string', default='',
                    dest='default_lv2_path',
-                   help='Default LV2 path to use if LV2_PATH is unset')
+                   help='default LV2 path to use if LV2_PATH is unset')
 
 def configure(conf):
     conf.load('compiler_c')
+    try:
+        conf.load('compiler_cxx')
+    except:
+        pass
 
     if Options.options.bindings:
         try:
@@ -72,7 +77,6 @@ def configure(conf):
             Logs.warn('Failed to configure Python (%s)\n' % sys.exc_info()[1])
 
     autowaf.configure(conf)
-    autowaf.set_c99_mode(conf)
     autowaf.display_header('Lilv Configuration')
 
     conf.env.BASH_COMPLETION = not Options.options.no_bash_completion
@@ -356,6 +360,19 @@ def build(bld):
                   cflags       = test_cflags,
                   linkflags    = test_linkflags)
         autowaf.use_lib(bld, obj, 'SERD SORD SRATOM LV2')
+
+        # C++ API test
+        if 'COMPILER_CXX' in bld.env:
+            obj = bld(features     = 'cxx cxxprogram',
+                      source       = 'test/lilv_cxx_test.cpp',
+                      includes     = ['.', './src'],
+                      use          = 'liblilv_profiled',
+                      lib          = test_libs,
+                      target       = 'test/lilv_cxx_test',
+                      install_path = None,
+                      cxxflags     = test_cflags,
+                      linkflags    = test_linkflags)
+            autowaf.use_lib(bld, obj, 'SERD SORD SRATOM LV2')
 
         if bld.is_defined('LILV_PYTHON'):
             # Copy Python unittest files
