@@ -32,12 +32,14 @@ lilv_world_new(void)
 	LilvWorld* world = (LilvWorld*)malloc(sizeof(LilvWorld));
 
 	world->world = sord_world_new();
-	if (!world->world)
+	if (!world->world) {
 		goto fail;
+	}
 
 	world->model = sord_new(world->world, SORD_SPO|SORD_OPS, true);
-	if (!world->model)
+	if (!world->model) {
 		goto fail;
+	}
 
 	world->specs          = NULL;
 	world->plugin_classes = lilv_plugin_classes_new();
@@ -52,7 +54,7 @@ lilv_world_new(void)
 #define NS_DYNMAN  "http://lv2plug.in/ns/ext/dynmanifest#"
 #define NS_OWL     "http://www.w3.org/2002/07/owl#"
 
-#define NEW_URI(uri) sord_new_uri(world->world, (const uint8_t*)uri)
+#define NEW_URI(uri) sord_new_uri(world->world, (const uint8_t*)(uri))
 
 	world->uris.dc_replaces         = NEW_URI(NS_DCTERMS   "replaces");
 	world->uris.dman_DynManifest    = NEW_URI(NS_DYNMAN    "DynManifest");
@@ -149,7 +151,7 @@ lilv_world_free(LilvWorld* world)
 	zix_tree_free((ZixTree*)world->loaded_files);
 	world->loaded_files = NULL;
 
-	zix_tree_free((ZixTree*)world->libs);
+	zix_tree_free(world->libs);
 	world->libs = NULL;
 
 	zix_tree_free((ZixTree*)world->plugin_classes);
@@ -166,21 +168,21 @@ lilv_world_free(LilvWorld* world)
 
 LILV_API void
 lilv_world_set_option(LilvWorld*      world,
-                      const char*     option,
+                      const char*     uri,
                       const LilvNode* value)
 {
-	if (!strcmp(option, LILV_OPTION_DYN_MANIFEST)) {
+	if (!strcmp(uri, LILV_OPTION_DYN_MANIFEST)) {
 		if (lilv_node_is_bool(value)) {
 			world->opt.dyn_manifest = lilv_node_as_bool(value);
 			return;
 		}
-	} else if (!strcmp(option, LILV_OPTION_FILTER_LANG)) {
+	} else if (!strcmp(uri, LILV_OPTION_FILTER_LANG)) {
 		if (lilv_node_is_bool(value)) {
 			world->opt.filter_language = lilv_node_as_bool(value);
 			return;
 		}
 	}
-	LILV_WARNF("Unrecognized or invalid option `%s'\n", option);
+	LILV_WARNF("Unrecognized or invalid option `%s'\n", uri);
 }
 
 LILV_API LilvNodes*
@@ -482,7 +484,6 @@ lilv_world_load_dyn_manifest(LilvWorld*      world,
 		return;
 	}
 
-	typedef void* LV2_Dyn_Manifest_Handle;
 	LV2_Dyn_Manifest_Handle handle = NULL;
 
 	// ?dman a dynman:DynManifest bundle_node
@@ -596,6 +597,9 @@ lilv_world_load_dyn_manifest(LilvWorld*      world,
 			const SordNode* plug = sord_iter_get_node(p, SORD_SUBJECT);
 			lilv_world_add_plugin(world, plug, manifest, desc, bundle_node);
 		}
+		if (desc->refs == 0) {
+			free(desc);
+		}
 		sord_iter_free(p);
 		sord_free(plugins);
 		lilv_free(lib_path);
@@ -610,7 +614,7 @@ lilv_world_get_manifest_uri(LilvWorld* world, const LilvNode* bundle_uri)
 {
 	SerdNode manifest_uri = lilv_new_uri_relative_to_base(
 		(const uint8_t*)"manifest.ttl",
-		(const uint8_t*)sord_node_get_string(bundle_uri->node));
+		sord_node_get_string(bundle_uri->node));
 	LilvNode* manifest = lilv_new_uri(world, (const char*)manifest_uri.buf);
 	serd_node_free(&manifest_uri);
 	return manifest;
@@ -893,8 +897,9 @@ static void
 load_dir_entry(const char* dir, const char* name, void* data)
 {
 	LilvWorld* world = (LilvWorld*)data;
-	if (!strcmp(name, ".") || !strcmp(name, ".."))
+	if (!strcmp(name, ".") || !strcmp(name, "..")) {
 		return;
+	}
 
 	char*     path = lilv_strjoin(dir, "/", name, "/", NULL);
 	SerdNode  suri = serd_node_new_file_uri((const uint8_t*)path, 0, 0, true);
@@ -1012,8 +1017,9 @@ LILV_API void
 lilv_world_load_all(LilvWorld* world)
 {
 	const char* lv2_path = getenv("LV2_PATH");
-	if (!lv2_path)
+	if (!lv2_path) {
 		lv2_path = LILV_DEFAULT_LV2_PATH;
+	}
 
 	// Discover bundles and read all manifest files into model
 	lilv_world_load_path(world, lv2_path);

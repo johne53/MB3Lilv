@@ -230,9 +230,11 @@ main(int argc, char** argv)
 	const char* plugin_uri = NULL;
 	for (int i = 1; i < argc; ++i) {
 		if (!strcmp(argv[i], "--version")) {
+			free(self.params);
 			print_version();
 			return 0;
 		} else if (!strcmp(argv[i], "--help")) {
+			free(self.params);
 			return print_usage(0);
 		} else if (!strcmp(argv[i], "-i")) {
 			self.in_path = argv[++i];
@@ -289,7 +291,8 @@ main(int argc, char** argv)
 		return 5;
 	}
 
-	if (in_fmt.channels != (int)self.n_audio_in && in_fmt.channels != 1) {
+	if (self.n_audio_in == 0 ||
+	    (in_fmt.channels != (int)self.n_audio_in && in_fmt.channels != 1)) {
 		return fatal(&self, 6, "Unable to map %d inputs to %d ports\n",
 		             in_fmt.channels, self.n_audio_in);
 	}

@@ -86,8 +86,9 @@ lilv_strjoin(const char* first, ...)
 	va_start(args, first);
 	while (1) {
 		const char* const s = va_arg(args, const char *);
-		if (s == NULL)
+		if (s == NULL) {
 			break;
+		}
 
 		const size_t this_len   = strlen(s);
 		char*        new_result = (char*)realloc(result, len + this_len + 1);
@@ -547,11 +548,6 @@ lilv_dir_for_each(const char* path,
 #else
 	DIR* dir = opendir(path);
 	if (dir) {
-		long name_max = pathconf(path, _PC_NAME_MAX);
-		if (name_max == -1) {
-			name_max = 255;   // Limit not defined, or error
-		}
-
 		for (struct dirent* entry; (entry = readdir(dir));) {
 			f(path, entry->d_name, data);
 		}
