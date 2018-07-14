@@ -104,6 +104,16 @@ def configure(conf):
     if conf.env.DEST_OS == 'darwin':
         defines += ['_DARWIN_C_SOURCE']
 
+    rt_lib  = ['rt']
+    if conf.env.DEST_OS == 'darwin' or conf.env.DEST_OS == 'win32':
+        rt_lib = []
+
+    autowaf.check_function(conf, 'c', 'lstat',
+                           header_name = ['sys/stat.h'],
+                           defines     = defines,
+                           define_name = 'HAVE_LSTAT',
+                           mandatory   = False)
+
     autowaf.check_function(conf, 'c', 'flock',
                            header_name = 'sys/file.h',
                            defines     = defines,
@@ -121,7 +131,7 @@ def configure(conf):
                            defines      = ['_POSIX_C_SOURCE=200809L'],
                            define_name  = 'HAVE_CLOCK_GETTIME',
                            uselib_store = 'CLOCK_GETTIME',
-                           lib          = ['rt'],
+                           lib          = rt_lib,
                            mandatory    = False)
 
     conf.check_cc(define_name = 'HAVE_LIBDL',
@@ -231,7 +241,6 @@ def build(bld):
         lib = []
     if bld.env.MSVC_COMPILER:
         libflags = []
-        defines  = ['snprintf=_snprintf']
 
     # Pkgconfig file
     autowaf.build_pc(bld, 'LILV', LILV_VERSION, LILV_MAJOR_VERSION, [],
@@ -276,6 +285,8 @@ def build(bld):
             install_path = '${PYTHONDIR}')
 
     if bld.env.BUILD_TESTS:
+        import re
+
         test_libs      = lib
         test_cflags    = ['']
         test_linkflags = ['']
@@ -283,17 +294,12 @@ def build(bld):
             test_cflags    += ['--coverage']
             test_linkflags += ['--coverage']
 
-        # Test plugin library
-        penv          = bld.env.derive()
-        shlib_pattern = penv.cshlib_PATTERN
-        if shlib_pattern.startswith('lib'):
-            shlib_pattern = shlib_pattern[3:]
-        penv.cshlib_PATTERN   = shlib_pattern
-        shlib_ext = shlib_pattern[shlib_pattern.rfind('.'):]
+        # Make a pattern for shared objects without the 'lib' prefix
+        module_pattern = re.sub('^lib', '', bld.env.cshlib_PATTERN)
+        shlib_ext = module_pattern[module_pattern.rfind('.'):]
 
         for p in ['test'] + test_plugins:
             obj = bld(features     = 'c cshlib',
-                      env          = penv,
                       source       = 'test/%s.lv2/%s.c' % (p, p),
                       name         = p,
                       target       = 'test/%s.lv2/%s' % (p, p),
@@ -303,6 +309,7 @@ def build(bld):
                       linkflags    = test_linkflags,
                       lib          = test_libs,
                       uselib       = 'LV2')
+            obj.env.cshlib_PATTERN = module_pattern
 
         for p in test_plugins:
             if not bld.path.find_node('test/%s.lv2/test_%s.c' % (p, p)):
@@ -386,7 +393,6 @@ def build(bld):
 
             # Build bindings test plugin
             obj = bld(features     = 'c cshlib',
-                      env          = penv,
                       source       = 'bindings/test/bindings_test_plugin.c',
                       name         = 'bindings_test_plugin',
                       target       = 'bindings/bindings_test_plugin.lv2/bindings_test_plugin',
@@ -396,6 +402,7 @@ def build(bld):
                       linkflags    = test_linkflags,
                       lib          = test_libs,
                       uselib       = 'LV2')
+            obj.env.cshlib_PATTERN = module_pattern
 
             # Bindings test plugin data files
             for i in [ 'manifest.ttl.in', 'bindings_test_plugin.ttl.in' ]:
@@ -422,7 +429,7 @@ def build(bld):
     # lv2bench (less portable than other utilities)
     if bld.is_defined('HAVE_CLOCK_GETTIME') and not bld.env.STATIC_PROGS:
         obj = build_util(bld, 'utils/lv2bench', defines)
-        if not bld.env.MSVC_COMPILER:
+        if not bld.env.MSVC_COMPILER and not bld.env.DEST_OS == 'darwin':
             obj.lib = ['rt']
 
     # Documentation

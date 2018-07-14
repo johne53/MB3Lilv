@@ -39,8 +39,9 @@
 #    include <io.h>
 #    define F_OK 0
 #    define mkdir(path, flags) _mkdir(path)
+#    if defined(_MSC_VER) && _MSC_VER <= 1400
 /** Implement 'CreateSymbolicLink()' for MSVC 8 or earlier */
-BOOLEAN WINAPI
+extern "C" BOOLEAN WINAPI
 CreateSymbolicLink(LPCTSTR linkpath, LPCTSTR targetpath, DWORD flags)
 {
 	typedef BOOLEAN (WINAPI* PFUNC)(LPCTSTR, LPCTSTR, DWORD);
@@ -49,6 +50,7 @@ CreateSymbolicLink(LPCTSTR linkpath, LPCTSTR targetpath, DWORD flags)
 	                                  "CreateSymbolicLinkA");
 	return pfn ? pfn(linkpath, targetpath, flags) : 0;
 }
+#    endif
 #else
 #    include <dirent.h>
 #    include <limits.h>
@@ -270,7 +272,12 @@ lilv_dirname(const char* path)
 bool
 lilv_path_exists(const char* path, void* ignored)
 {
+#ifdef HAVE_LSTAT
+	struct stat st;
+	return !lstat(path, &st);
+#else
 	return !access(path, F_OK);
+#endif
 }
 
 char*
@@ -428,6 +435,10 @@ lilv_get_latest_copy(const char* path, const char* copy_path)
 char*
 lilv_realpath(const char* path)
 {
+	if (!path) {
+		return NULL;
+	}
+
 #if defined(_WIN32)
 	char* out = (char*)malloc(MAX_PATH);
 	GetFullPathName(path, MAX_PATH, out, NULL);
