@@ -283,3 +283,6 @@ depcomp
 install-sh
 m4/
 missing
+build/**
+.waf-*
+.lock-waf*

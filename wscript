@@ -1,18 +1,18 @@
 #!/usr/bin/env python
+
 import os
 import shutil
 import subprocess
 import sys
-import waflib.Options as Options
-import waflib.extras.autowaf as autowaf
-import waflib.Build as Build
-import waflib.Logs as Logs
+
+from waflib import Options, Logs
+from waflib.extras import autowaf
 
 # Library and package version (UNIX style major, minor, micro)
 # major increment <=> incompatible changes
 # minor increment <=> compatible changes (additions)
 # micro increment <=> no interface changes
-LILV_VERSION       = '0.24.4'
+LILV_VERSION       = '0.24.5'
 LILV_MAJOR_VERSION = '0'
 
 # Mandatory waf variables
@@ -41,21 +41,16 @@ def options(ctx):
     ctx.load('python')
     autowaf.set_options(ctx, test=True)
     opt = ctx.get_option_group('Configuration options')
-    opt.add_option('--no-utils', action='store_true', dest='no_utils',
-                   help='do not build command line utilities')
-    opt.add_option('--bindings', action='store_true', dest='bindings',
-                   help='build python bindings')
-    opt.add_option('--dyn-manifest', action='store_true', dest='dyn_manifest',
-                   help='build support for dynamic manifests')
-    opt.add_option('--no-bash-completion', action='store_true',
-                   dest='no_bash_completion',
-                   help='do not install bash completion script in CONFIGDIR')
-    opt.add_option('--static', action='store_true', dest='static',
-                   help='build static library')
-    opt.add_option('--no-shared', action='store_true', dest='no_shared',
-                   help='do not build shared library')
-    opt.add_option('--static-progs', action='store_true', dest='static_progs',
-                   help='build programs as static binaries')
+    autowaf.add_flags(
+        opt,
+        {'no-utils':           'do not build command line utilities',
+         'bindings':           'build python bindings',
+         'dyn-manifest':       'build support for dynamic manifests',
+         'no-bash-completion': 'do not install bash completion script',
+         'static':             'build static library',
+         'no-shared':          'do not build shared library',
+         'static-progs':       'build programs as static binaries'})
+
     opt.add_option('--default-lv2-path', type='string', default='',
                    dest='default_lv2_path',
                    help='default LV2 path to use if LV2_PATH is unset')
@@ -138,7 +133,6 @@ def configure(conf):
                   lib         = 'dl',
                   mandatory   = False)
 
-    autowaf.define(conf, 'LILV_VERSION', LILV_VERSION)
     if Options.options.dyn_manifest:
         autowaf.define(conf, 'LILV_DYN_MANIFEST', 1)
 
@@ -176,20 +170,15 @@ def configure(conf):
     autowaf.set_lib_env(conf, 'lilv', LILV_VERSION)
     conf.write_config_header('lilv_config.h', remove=False)
 
-    autowaf.display_summary(conf)
-    autowaf.display_msg(conf, 'Default LV2_PATH',
-                        conf.env.LILV_DEFAULT_LV2_PATH)
-    autowaf.display_msg(conf, 'Utilities',
-                        bool(conf.env.BUILD_UTILS))
-    autowaf.display_msg(conf, 'Unit tests',
-                        bool(conf.env.BUILD_TESTS))
-    autowaf.display_msg(conf, 'Dynamic manifest support',
-                        bool(conf.env.LILV_DYN_MANIFEST))
-    autowaf.display_msg(conf, 'Python bindings',
-                        conf.is_defined('LILV_PYTHON'))
+    autowaf.display_summary(
+        conf,
+        {'Default LV2_PATH':         conf.env.LILV_DEFAULT_LV2_PATH,
+         'Utilities':                bool(conf.env.BUILD_UTILS),
+         'Unit tests':               bool(conf.env.BUILD_TESTS),
+         'Dynamic manifest support': bool(conf.env.LILV_DYN_MANIFEST),
+         'Python bindings':          conf.is_defined('LILV_PYTHON')})
 
     conf.undefine('LILV_DEFAULT_LV2_PATH')  # Cmd line errors with VC++
-    print('')
 
 def build_util(bld, name, defines, libs=''):
     obj = bld(features     = 'c cprogram',
@@ -423,14 +412,14 @@ def build(bld):
         for i in utils.split():
             build_util(bld, i, defines)
 
-    if bld.env.HAVE_SNDFILE:
-        obj = build_util(bld, 'utils/lv2apply', defines, 'SNDFILE')
+        if bld.env.HAVE_SNDFILE:
+            obj = build_util(bld, 'utils/lv2apply', defines, 'SNDFILE')
 
-    # lv2bench (less portable than other utilities)
-    if bld.is_defined('HAVE_CLOCK_GETTIME') and not bld.env.STATIC_PROGS:
-        obj = build_util(bld, 'utils/lv2bench', defines)
-        if not bld.env.MSVC_COMPILER and not bld.env.DEST_OS == 'darwin':
-            obj.lib = ['rt']
+        # lv2bench (less portable than other utilities)
+        if bld.is_defined('HAVE_CLOCK_GETTIME') and not bld.env.STATIC_PROGS:
+            obj = build_util(bld, 'utils/lv2bench', defines)
+            if bld.env.DEST_OS != 'win32' and bld.env.DEST_OS != 'darwin':
+                obj.lib = ['rt']
 
     # Documentation
     autowaf.build_dox(bld, 'LILV', LILV_VERSION, top, out)

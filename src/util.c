@@ -39,9 +39,12 @@
 #    include <io.h>
 #    define F_OK 0
 #    define mkdir(path, flags) _mkdir(path)
-#    if defined(_MSC_VER) && _MSC_VER <= 1400
+#    if (defined(_MSC_VER) && _MSC_VER <= 1400) || defined(__MINGW64__) || defined(__MINGW32__)
 /** Implement 'CreateSymbolicLink()' for MSVC 8 or earlier */
-extern "C" BOOLEAN WINAPI
+#ifdef __cplusplus
+extern "C"
+#endif
+BOOLEAN WINAPI
 CreateSymbolicLink(LPCTSTR linkpath, LPCTSTR targetpath, DWORD flags)
 {
 	typedef BOOLEAN (WINAPI* PFUNC)(LPCTSTR, LPCTSTR, DWORD);
@@ -270,7 +273,7 @@ lilv_dirname(const char* path)
 }
 
 bool
-lilv_path_exists(const char* path, void* ignored)
+lilv_path_exists(const char* path, const void* ignored)
 {
 #ifdef HAVE_LSTAT
 	struct stat st;
@@ -282,7 +285,8 @@ lilv_path_exists(const char* path, void* ignored)
 
 char*
 lilv_find_free_path(const char* in_path,
-                    bool (*exists)(const char*, void*), void* user_data)
+                    bool (*exists)(const char*, const void*),
+                    const void* user_data)
 {
 	const size_t in_path_len = strlen(in_path);
 	char*        path        = (char*)malloc(in_path_len + 7);
@@ -333,6 +337,13 @@ lilv_copy_file(const char* src, const char* dst)
 	return st;
 }
 
+static inline bool
+is_windows_path(const char* path)
+{
+	return (isalpha(path[0]) && (path[1] == ':' || path[1] == '|') &&
+	        (path[2] == '/' || path[2] == '\\'));
+}
+
 bool
 lilv_path_is_absolute(const char* path)
 {
@@ -341,7 +352,7 @@ lilv_path_is_absolute(const char* path)
 	}
 
 #ifdef _WIN32
-	if (isalpha(path[0]) && path[1] == ':' && lilv_is_dir_sep(path[2])) {
+	if (is_windows_path(path)) {
 		return true;
 	}
 #endif
@@ -572,7 +583,15 @@ lilv_mkdir_p(const char* dir_path)
 {
 	char*        path     = lilv_strdup(dir_path);
 	const size_t path_len = strlen(path);
-	for (size_t i = 1; i <= path_len; ++i) {
+	size_t       i        = 1;
+
+#ifdef _WIN32
+	if (is_windows_path(dir_path)) {
+		i = 3;
+	}
+#endif
+
+	for (; i <= path_len; ++i) {
 		if (path[i] == LILV_DIR_SEP[0] || path[i] == '\0') {
 			path[i] = '\0';
 			if (mkdir(path, 0755) && errno != EEXIST) {
